@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      channel:
+        description: 'Release channel'
+        required: true
+        type: choice
+        default: latest
+        options:
+          - latest
+          - beta
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: npm-release
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Assert main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases must be triggered from the main branch"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality checks
+        run: |
+          npm run lint --if-present
+          npm run typecheck --if-present
+          npm test --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Compute next version
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          # Strip any existing prerelease suffix to get the base version
+          BASE=$(echo "$CURRENT" | sed 's/-.*//')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+
+          case "${{ inputs.bump }}" in
+            patch) NEXT_BASE="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+            minor) NEXT_BASE="$MAJOR.$((MINOR + 1)).0" ;;
+            major) NEXT_BASE="$((MAJOR + 1)).0.0" ;;
+          esac
+
+          if [[ "${{ inputs.channel }}" == "beta" ]]; then
+            PKG=$(node -p "require('./package.json').name")
+            # Find the highest existing beta for this base version on npm
+            EXISTING=$(npm view "${PKG}" versions --json 2>/dev/null \
+              | node -p "
+                  const vs = JSON.parse(require('fs').readFileSync(0,'utf8'));
+                  const betas = (Array.isArray(vs) ? vs : [vs])
+                    .filter(v => v.startsWith('${NEXT_BASE}-beta.'))
+                    .map(v => parseInt(v.split('-beta.')[1], 10))
+                    .filter(n => !isNaN(n));
+                  betas.length ? Math.max(...betas) : -1
+                " 2>/dev/null || echo "-1")
+            BETA_NUM=$((EXISTING + 1))
+            NEXT="${NEXT_BASE}-beta.${BETA_NUM}"
+          else
+            NEXT="$NEXT_BASE"
+          fi
+
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+          echo "channel=${{ inputs.channel }}" >> "$GITHUB_OUTPUT"
+          echo "### Release: $CURRENT → $NEXT (${{ inputs.channel }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guard against duplicate release
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          NEXT="${{ steps.version.outputs.next }}"
+          PKG=$(node -p "require('./package.json').name")
+
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "::error::Tag ${TAG} already exists on origin"
+            exit 1
+          fi
+
+          if npm view "${PKG}@${NEXT}" version 2>/dev/null; then
+            echo "::error::${PKG}@${NEXT} already exists on npm"
+            exit 1
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        run: |
+          npm version "${{ steps.version.outputs.next }}" --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "release: v${{ steps.version.outputs.next }}"
+          git tag "v${{ steps.version.outputs.next }}"
+
+      - name: Verify package contents
+        run: npm pack --dry-run 2>&1 | tee /dev/stderr | grep -q "dist/"
+
+      - name: Push commit and tag
+        run: git push --follow-tags
+
+      - name: Publish to npm
+        run: |
+          npm publish --access public --provenance \
+            --tag "${{ steps.version.outputs.channel }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.version.outputs.channel }}" == "beta" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --generate-notes \
+            $PRERELEASE_FLAG

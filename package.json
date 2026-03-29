@@ -1,0 +1,37 @@
+{
+  "name": "@qaily/playwright-jsonl-reporter",
+  "version": "1.0.0",
+  "description": "Playwright reporter that generates JSONL files optimized for analysis and DuckDB queries",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "playwright",
+    "reporter",
+    "jsonl",
+    "test-results",
+    "duckdb"
+  ],
+  "author": "Qaily",
+  "license": "MIT",
+  "peerDependencies": {
+    "@playwright/test": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
