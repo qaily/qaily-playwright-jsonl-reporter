@@ -24,6 +24,10 @@
     "test-results",
     "duckdb"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qaily/qaily-playwright-jsonl-reporter"
+  },
   "author": "Qaily",
   "license": "MIT",
   "peerDependencies": {
