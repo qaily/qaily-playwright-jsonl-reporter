@@ -130,13 +130,15 @@ jobs:
           npm version "${{ steps.version.outputs.next }}" --no-git-tag-version
           git add package.json package-lock.json
           git commit -m "release: v${{ steps.version.outputs.next }}"
-          git tag "v${{ steps.version.outputs.next }}"
+          git tag -a "v${{ steps.version.outputs.next }}" -m "release: v${{ steps.version.outputs.next }}"
 
       - name: Verify package contents
         run: npm pack --dry-run 2>&1 | tee /dev/stderr | grep -q "dist/"
 
       - name: Push commit and tag
-        run: git push --follow-tags
+        run: |
+          git push
+          git push origin "v${{ steps.version.outputs.next }}"
 
       - name: Publish to npm
         run: |
