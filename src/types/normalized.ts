@@ -31,6 +31,7 @@ export interface NormalizedMetadata {
   git_branch?: string;
   ci_build_url?: string;
   tool_version?: string;
+  environment?: string;
 }
 
 /**

@@ -29,6 +29,9 @@ export interface GeneratorOptions {
  * Core reporter options (JSONL generation). Optional hook after files are written.
  */
 export interface PlaywrightJsonlReporterCoreOptions extends GeneratorOptions {
+  /** Environment name (e.g. 'staging', 'production'). Included in manifest run_start record. */
+  environment?: string;
+
   /**
    * Optional callback after JSONL output is written.
    */

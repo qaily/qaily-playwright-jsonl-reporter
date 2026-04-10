@@ -19,20 +19,20 @@ export function truncate(text: string, maxLength: number = 500): string {
 }
 
 /**
- * Generate run ID from timestamp and git hash
+ * Generate run ID from timestamp, git hash, and process ID
  *
  * @param startTime - ISO 8601 timestamp string
  * @param gitHash - Git commit hash (optional)
- * @returns Run ID in format: {timestamp}_{hash}
+ * @returns Run ID in format: {timestamp_with_ms}_{hash}_{pid}
  *
  * @example
  * generateRunId('2025-12-09T06:05:22.386Z', '8bfed0960384f0b9095ab7c1083393be11902da9')
- * // Returns: '2025-12-09T06-05-22_8bfed09'
+ * // Returns: '2025-12-09T06-05-22-386_8bfed09_48291'
  */
 export function generateRunId(startTime: string, gitHash?: string): string {
-  const timestamp = new Date(startTime).toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const timestamp = new Date(startTime).toISOString().replace(/[:.]/g, '-').slice(0, 23);
   const hash = gitHash?.slice(0, 7) || 'unknown';
-  return `${timestamp}_${hash}`;
+  return `${timestamp}_${hash}_${process.pid}`;
 }
 
 /**

@@ -270,6 +270,7 @@ class PlaywrightJsonlReporterCore implements Reporter {
         git_branch: gitBranch,
         ci_build_url: metadata?.ci?.buildHref,
         tool_version: this.config?.version,
+        environment: this.options.environment,
       },
       tests: Array.from(this.testResults.values()),
     };

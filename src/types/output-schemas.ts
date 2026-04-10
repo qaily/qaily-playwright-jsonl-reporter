@@ -157,6 +157,7 @@ export interface ManifestRunStart extends ManifestRecordBase {
   git_branch?: string;
   ci_url?: string;
   pw_version?: string;
+  environment?: string;
 }
 
 /**
