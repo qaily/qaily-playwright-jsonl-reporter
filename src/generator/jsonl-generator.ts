@@ -309,6 +309,8 @@ export class JsonlGenerator {
       ci_url: run.metadata.ci_build_url,
       pw_version: run.metadata.tool_version,
       environment: run.metadata.environment,
+      tag: run.metadata.tag,
+      category: run.metadata.category,
     };
 
     const runEnd: ManifestRunEnd = {

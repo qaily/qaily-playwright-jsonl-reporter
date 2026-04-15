@@ -32,6 +32,8 @@ export interface NormalizedMetadata {
   ci_build_url?: string;
   tool_version?: string;
   environment?: string;
+  tag?: string;
+  category?: string;
 }
 
 /**

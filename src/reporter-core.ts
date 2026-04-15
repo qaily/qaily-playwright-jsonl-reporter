@@ -271,6 +271,8 @@ class PlaywrightJsonlReporterCore implements Reporter {
         ci_build_url: metadata?.ci?.buildHref,
         tool_version: this.config?.version,
         environment: this.options.environment,
+        tag: this.options.tag,
+        category: this.options.category,
       },
       tests: Array.from(this.testResults.values()),
     };

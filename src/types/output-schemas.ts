@@ -158,6 +158,8 @@ export interface ManifestRunStart extends ManifestRecordBase {
   ci_url?: string;
   pw_version?: string;
   environment?: string;
+  tag?: string;
+  category?: string;
 }
 
 /**
