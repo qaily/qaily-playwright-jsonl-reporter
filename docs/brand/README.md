@@ -11,6 +11,6 @@ This repository keeps brand guidance as URL pointers only. Canonical brand prose
 ## Maintenance workflow
 
 - Spot-check public bios and short descriptions in this repo against **Brand: Channel copy (drafts)**.
-- Current repo copy to review: `/home/runner/work/qaily-playwright-jsonl-reporter/qaily-playwright-jsonl-reporter/package.json` `description`, `/home/runner/work/qaily-playwright-jsonl-reporter/qaily-playwright-jsonl-reporter/README.md` opening description, and any GitHub or npm metadata derived from them.
+- Current repo copy to review: `package.json` `description`, `README.md` opening description, and any GitHub or npm metadata derived from them.
 - When PRD or brand docs change, update the canonical Linear documents with `save_document` by document id.
 - Keep git limited to URL pointers and maintenance notes instead of copying brand PRD or channel-copy prose into this repository.
