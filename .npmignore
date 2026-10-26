@@ -1,8 +1,12 @@
 src/
 .github/
 tsconfig.json
+tsconfig.build.json
 *.tsbuildinfo
 *.log
 .DS_Store
 node_modules/
 coverage/
+tests/
+playwright.config.ts
+test-results/

@@ -70,6 +70,8 @@ export interface NormalizedAnnotation {
  */
 export interface NormalizedAttempt {
   attempt_number: number; // 0 = first run, 1+ = retries
+  retry?: number; // Playwright testInfo.retry (defaults to attempt_number)
+  repeat_each_index?: number; // Playwright testInfo.repeatEachIndex (--repeat-each)
   status: 'passed' | 'failed' | 'skipped';
   duration_ms: number;
   started_at: string;

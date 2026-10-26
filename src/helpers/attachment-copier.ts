@@ -2,40 +2,60 @@
  * Attachment Copier
  *
  * Copies attachment files (screenshots, traces, etc.) to the report directory
- * and updates paths in attachment records to be relative to the report directory.
+ * under unique keys (see attachment-naming) and builds attachment records from
+ * what was actually stored.
  */
 
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { NormalizedAttachment, AttachmentRecord } from '../types';
+import { attachmentKey, attachmentKind } from './attachment-naming';
 
 export interface CopyAttachmentResult {
   success: boolean;
   newPath: string;
+  size?: number;
+  hash?: string;
   error?: string;
 }
 
+export interface CopyAttachmentsContext {
+  /** Test run ID */
+  runId: string;
+  /** Full Playwright test ID */
+  testId: string;
+  /** Attempt index (0-based, as written to the index) */
+  attempt: number;
+  /** Playwright retry (defaults to attempt) */
+  retry?: number;
+  /** Playwright repeatEachIndex */
+  repeatEachIndex?: number;
+  /** Keys already used in this run; shared across all calls of one run */
+  usedKeys: Set<string>;
+}
+
 /**
- * Copy attachment files to report directory and update paths
+ * Copy attachment files to report directory and build attachment records
  *
- * @param attachments - Array of normalized attachments with original paths
+ * @param attachments - Array of normalized attachments with original paths (one attempt)
  * @param outputDir - Report output directory (e.g., reports/data/{run_id})
- * @param runId - Test run ID
- * @param testId - Test ID
- * @param attempt - Attempt number
- * @returns Array of updated attachment records with new relative paths
+ * @param context - Run/test/attempt identity and the run-wide set of used keys
+ * @returns Attachment records with the paths actually stored
  */
 export async function copyAttachments(
   attachments: NormalizedAttachment[],
   outputDir: string,
-  runId: string,
-  testId: string,
-  attempt: number
+  context: CopyAttachmentsContext
 ): Promise<{ records: AttachmentRecord[]; copiedCount: number; failedCount: number }> {
+  const { runId, testId, attempt, usedKeys } = context;
+  const retry = context.retry ?? attempt;
   const attachmentsDir = path.join(outputDir, 'attachments');
   fs.mkdirSync(attachmentsDir, { recursive: true });
 
   const records: AttachmentRecord[] = [];
+  // Per-kind counter within this attempt
+  const kindCounts = new Map<string, number>();
   let copiedCount = 0;
   let failedCount = 0;
 
@@ -55,8 +75,23 @@ export async function copyAttachments(
       continue;
     }
 
-    const result = await copyAttachmentFile(attachment, attachmentsDir, testId, attempt);
-    
+    const originalName = path.basename(attachment.file_path);
+    const kind = attachmentKind(attachment.name, originalName);
+    const ext = path.extname(originalName);
+
+    let counter = (kindCounts.get(kind) ?? 0) + 1;
+    let key = attachmentKey({ testId, retry, repeatEachIndex: context.repeatEachIndex, kind, counter, ext });
+    while (usedKeys.has(key)) {
+      // Should never happen: the key is unique per test/retry/repeat/kind/counter
+      console.error(`[Playwright JSONL Reporter] Duplicate attachment key ${key}, using next counter`);
+      counter++;
+      key = attachmentKey({ testId, retry, repeatEachIndex: context.repeatEachIndex, kind, counter, ext });
+    }
+    kindCounts.set(kind, counter);
+    usedKeys.add(key);
+
+    const result = copyAttachmentFile(attachment.file_path, attachmentsDir, key);
+
     if (result.success) {
       records.push({
         run_id: runId,
@@ -64,13 +99,12 @@ export async function copyAttachments(
         attempt,
         name: attachment.name,
         type: attachment.content_type,
-        path: result.newPath, // Relative path: attachments/filename.png
-        size: getFileSize(attachment.file_path),
-        hash: null, // TODO: implement if includeAttachmentChecksums is true
+        path: result.newPath, // Relative path: attachments/<key>
+        size: result.size ?? null,
+        hash: result.hash ?? null,
       });
       copiedCount++;
     } else {
-      // Still create record but with original path (will likely fail to load in UI)
       console.warn(`[Playwright JSONL Reporter] Failed to copy attachment: ${result.error}`);
       records.push({
         run_id: runId,
@@ -78,9 +112,10 @@ export async function copyAttachments(
         attempt,
         name: attachment.name,
         type: attachment.content_type,
-        path: attachment.file_path, // Keep original path as fallback
+        path: '',
         size: null,
         hash: null,
+        error: result.error,
       });
       failedCount++;
     }
@@ -90,17 +125,10 @@ export async function copyAttachments(
 }
 
 /**
- * Copy a single attachment file to the attachments directory
+ * Copy a single attachment file to the attachments directory under the given key.
+ * Never overwrites an existing file.
  */
-async function copyAttachmentFile(
-  attachment: NormalizedAttachment,
-  attachmentsDir: string,
-  testId: string,
-  attempt: number
-): Promise<CopyAttachmentResult> {
-  const originalPath = attachment.file_path;
-
-  // Check if file exists
+function copyAttachmentFile(originalPath: string, attachmentsDir: string, key: string): CopyAttachmentResult {
   if (!fs.existsSync(originalPath)) {
     return {
       success: false,
@@ -109,31 +137,17 @@ async function copyAttachmentFile(
     };
   }
 
-  // Generate unique filename to avoid conflicts
-  const originalName = path.basename(originalPath);
-  const ext = path.extname(originalName);
-  const baseName = path.basename(originalName, ext);
-  
-  // Create a safe filename: sanitize testId and create unique name
-  const sanitizedTestId = testId.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 20);
-  const timestamp = Date.now();
-  const uniqueName = `${baseName}-${sanitizedTestId}-${attempt}-${timestamp}${ext}`;
-  
-  // Fallback to original name if it's already unique enough
-  const finalName = originalName.length < 50 && !fs.existsSync(path.join(attachmentsDir, originalName))
-    ? originalName
-    : uniqueName;
-
-  const destPath = path.join(attachmentsDir, finalName);
-  const relativePath = `attachments/${finalName}`;
+  const destPath = path.join(attachmentsDir, key);
 
   try {
-    // Copy file
-    fs.copyFileSync(originalPath, destPath);
-    
+    fs.copyFileSync(originalPath, destPath, fs.constants.COPYFILE_EXCL);
+    const bytes = fs.readFileSync(destPath);
+
     return {
       success: true,
-      newPath: relativePath,
+      newPath: `attachments/${key}`,
+      size: bytes.length,
+      hash: crypto.createHash('sha256').update(bytes).digest('hex'),
     };
   } catch (error) {
     return {
@@ -143,16 +157,3 @@ async function copyAttachmentFile(
     };
   }
 }
-
-/**
- * Get file size in bytes
- */
-function getFileSize(filePath: string): number | null {
-  try {
-    const stat = fs.statSync(filePath);
-    return stat.size;
-  } catch {
-    return null;
-  }
-}
-

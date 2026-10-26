@@ -240,19 +240,22 @@ export class JsonlGenerator {
     const allRecords: AttachmentRecord[] = [];
     let totalCopied = 0;
     let totalFailed = 0;
+    // Keys used in this run: a key is never stored twice
+    const usedKeys = new Set<string>();
 
     for (const test of run.tests) {
       for (let i = 0; i < test.attempts.length; i++) {
         const attempt = test.attempts[i];
         
         if (attempt.attachments.length > 0) {
-          const { records, copiedCount, failedCount } = await copyAttachments(
-            attempt.attachments,
-            outputDir,
-            run.run_id,
-            test.test_id,
-            i
-          );
+          const { records, copiedCount, failedCount } = await copyAttachments(attempt.attachments, outputDir, {
+            runId: run.run_id,
+            testId: test.test_id,
+            attempt: i,
+            retry: attempt.retry,
+            repeatEachIndex: attempt.repeat_each_index,
+            usedKeys,
+          });
           
           allRecords.push(...records);
           totalCopied += copiedCount;

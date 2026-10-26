@@ -122,7 +122,8 @@ export interface AttachmentRecord {
   type: string; // content type (e.g., "image/png")
   path: string;
   size: number | null;
-  hash: string | null;
+  hash: string | null; // sha256 of the stored file
+  error?: string; // Set when the file could not be stored (path is then '')
 }
 
 // ============================================

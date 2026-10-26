@@ -139,7 +139,7 @@ class PlaywrightJsonlReporterCore implements Reporter {
     };
   }
 
-  private convertAttempt(_test: TestCase, result: TestResult, attemptNumber: number): NormalizedAttempt {
+  private convertAttempt(test: TestCase, result: TestResult, attemptNumber: number): NormalizedAttempt {
     const steps = this.convertSteps(result.steps);
 
     const normalizedStatus: 'passed' | 'failed' | 'skipped' =
@@ -151,6 +151,8 @@ class PlaywrightJsonlReporterCore implements Reporter {
 
     return {
       attempt_number: attemptNumber,
+      retry: result.retry,
+      repeat_each_index: test.repeatEachIndex,
       status: normalizedStatus,
       duration_ms: result.duration,
       started_at: result.startTime.toISOString(),

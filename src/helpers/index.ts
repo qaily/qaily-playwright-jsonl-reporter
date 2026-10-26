@@ -19,4 +19,6 @@ export {
   type JsonlWriterOptions,
 } from './jsonl-writer';
 
-export { copyAttachments, type CopyAttachmentResult } from './attachment-copier';
+export { copyAttachments, type CopyAttachmentResult, type CopyAttachmentsContext } from './attachment-copier';
+
+export { attachmentKey, attachmentKind, MAX_ATTACHMENT_NAME, type AttachmentKeyParts } from './attachment-naming';

@@ -25,6 +25,22 @@ Each test run produces a timestamped directory under `outputDir`:
 | `attachments-index.jsonl[.gz]` | Registry of all attachment files |
 | `attachments/` | Copied screenshots, traces, and other attachments |
 
+### Attachment file names
+
+Attachments are stored flat in `attachments/` under a unique, short name (≤ 64 chars):
+
+```
+<testId>-r<retry>[-x<repeat>]-<kind>[-<n>].<ext>
+```
+
+- `testId`: the full Playwright test id; `r<retry>`: the retry; `x<repeat>`: `--repeat-each` index, only when > 0
+- `kind`: `shot-1`, `shot-2` (screenshots), `debug` (`logs`), `ctx` (`error-context`), `trace`,
+  `net-f` (`network-log-filtered`), `net-v` (`network-log-verbose`); other names become a slug of up to 8 chars
+- `-<n>`: a counter, only when the same kind occurs more than once in one attempt
+
+A name is never stored twice in a run. Each `attachments-index` row carries the path actually stored, its `size`
+and SHA256 `hash`; a file that could not be copied gets `path: ""` and an `error`.
+
 ## Installation
 
 ```bash
@@ -56,7 +72,7 @@ export default defineConfig({
 | `outputDir` | `string` | `'./reports/data'` | Output directory for generated files |
 | `archived` | `boolean` | `true` | Write `.jsonl.gz` (true) or plain `.jsonl` (false) |
 | `writePlainText` | `boolean` | `true` | Also write a `sample-formatted.json` file (only when `archived: false`) |
-| `includeAttachmentChecksums` | `boolean` | `false` | Calculate SHA256 checksums for attachments |
+| `includeAttachmentChecksums` | `boolean` | `false` | Deprecated, no effect: the SHA256 `hash` and `size` of every stored attachment are always written |
 | `maxErrorMessageLength` | `number` | `500` | Truncate error messages to this length |
 | `compressLevel` | `number` | `6` | Gzip compression level (1–9, when `archived: true`) |
 | `afterJsonl` | `() => Promise<void>` | — | Callback after JSONL files are written |
